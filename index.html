@@ -3,68 +3,53 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mallikarjuna | Student Bio</title>
+  <title>Mallikarjuna | Student Profile</title>
   <style>
-    :root {
-      --bg-color: #121212;
-      --card-color: #1e1e1e;
-      --text-color: #e0e0e0;
-      --accent-color: #4db8ff;
-    }
-
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
       margin: 0;
-      padding: 0;
+      font-family: 'Georgia', serif;
+      background: #111;
+      color: #f4f4f4;
+      line-height: 1.8;
+      padding: 2rem;
     }
 
-    .container {
-      max-width: 900px;
+    .paper {
+      background: #1a1a1a;
+      max-width: 800px;
       margin: auto;
-      padding: 2rem;
+      padding: 3rem;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
     }
 
-    .card {
-      background-color: var(--card-color);
-      border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 0 10px rgba(0,0,0,0.4);
-      margin-bottom: 2rem;
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      color: #00acee;
+      letter-spacing: 1px;
     }
 
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      flex-wrap: wrap;
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.4rem;
+      color: #ffc107;
     }
 
-    .profile-img {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid var(--accent-color);
+    p {
+      font-size: 1.05rem;
+      margin-bottom: 1.2rem;
     }
 
-    h1, h2 {
-      color: var(--accent-color);
-      margin: 0.2em 0;
-    }
-
-    p, li {
-      font-size: 1rem;
-      line-height: 1.6;
-    }
-
-    ul {
-      padding-left: 1.5rem;
+    .signature {
+      margin-top: 3rem;
+      font-style: italic;
+      text-align: right;
+      color: #ccc;
     }
 
     a {
-      color: var(--accent-color);
+      color: #4db8ff;
       text-decoration: none;
     }
 
@@ -73,65 +58,51 @@
     }
 
     @media screen and (max-width: 600px) {
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
+      body {
+        padding: 1rem;
       }
-
-      .profile-img {
-        width: 100px;
-        height: 100px;
+      .paper {
+        padding: 1.5rem;
       }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="paper">
+    <h1>Mallikarjuna</h1>
+    <p><strong>Student of Computer Science</strong><br>
+    A learner with passion for programming, technology, and self-growth.</p>
 
-    <div class="card header">
-      <img src="profile.jpg" alt="Profile Photo" class="profile-img">
-      <div>
-        <h1>Mallikarjuna</h1>
-        <p>Student | Computer Science | Learner</p>
-      </div>
+    <h2>About Me</h2>
+    <p>
+      I’m currently pursuing my Bachelor's in Computer Science, constantly learning and building small projects. I enjoy solving problems through code and exploring how things work. I value clarity, focus, and a strong morning routine that energizes my day.
+    </p>
+
+    <h2>Skills</h2>
+    <p>
+      I work with Python, Java, and HTML/CSS. I'm also familiar with tools like GitHub, Pydroid, and basic web development techniques.
+    </p>
+
+    <h2>Projects</h2>
+    <p>
+      <strong>📘 Python Minis:</strong> A collection of small Python programs designed for learning and experimentation.<br>
+      <strong>🧠 Productivity Tools:</strong> Simple digital tools that help with daily organization and study planning.
+    </p>
+
+    <h2>Education</h2>
+    <p>
+      B.Sc Computer Science<br>
+      [Your College Name], [City]<br>
+      [202X – Present]
+    </p>
+
+    <h2>Contact</h2>
+    <p>Email: <a href="mailto:your.email@example.com">your.email@example.com</a><br>
+    GitHub: <a href="https://github.com/yourusername">github.com/yourusername</a></p>
+
+    <div class="signature">
+      — Mallikarjuna
     </div>
-
-    <div class="card">
-      <h2>About Me</h2>
-      <p>I am a passionate Computer Science student who enjoys exploring programming, native languages, and creative learning. I love building projects in Python, HTML, and Java, and sharing knowledge through meaningful content.</p>
-    </div>
-
-    <div class="card">
-      <h2>Education</h2>
-      <ul>
-        <li><strong>BSc in Computer Science</strong><br>
-        [Your College Name], [City] – [202X - 202X]</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h2>Skills</h2>
-      <ul>
-        <li>Languages: Python, Java, HTML/CSS</li>
-        <li>Tools: Git, Pydroid, VS Code</li>
-        <li>Interests: Native language etymology, Web apps, AI tools</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h2>Projects</h2>
-      <ul>
-        <li><strong>Melimi Telugu Dictionary</strong> – Native Telugu word exploration and dictionary creation.</li>
-        <li><strong>Python Tools</strong> – Basic logic apps and mini utilities for students.</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h2>Contact</h2>
-      <p>Email: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
-      <p>GitHub: <a href="https://github.com/yourusername">github.com/yourusername</a></p>
-    </div>
-
   </div>
 </body>
 </html>
