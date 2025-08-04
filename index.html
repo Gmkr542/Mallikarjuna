@@ -3,54 +3,92 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>My Bio - Student Portfolio</title>
+  <title>Mallikarjuna | Student Bio</title>
   <style>
+    :root {
+      --bg-color: #121212;
+      --card-color: #1e1e1e;
+      --text-color: #e0e0e0;
+      --accent-color: #4db8ff;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f9;
-      color: #333;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
       margin: 0;
       padding: 0;
     }
+
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: auto;
       padding: 2rem;
-      background-color: #fff;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      border-radius: 10px;
-      margin-top: 3rem;
     }
-    h1, h2 {
-      color: #2c3e50;
-    }
-    ul {
-      padding-left: 1.2rem;
-    }
-    .section {
+
+    .card {
+      background-color: var(--card-color);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
       margin-bottom: 2rem;
     }
-    .profile-img {
-      width: 120px;
-      border-radius: 50%;
-    }
+
     .header {
       display: flex;
       align-items: center;
       gap: 20px;
+      flex-wrap: wrap;
     }
-    .link {
-      color: #3498db;
+
+    .profile-img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--accent-color);
+    }
+
+    h1, h2 {
+      color: var(--accent-color);
+      margin: 0.2em 0;
+    }
+
+    p, li {
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    ul {
+      padding-left: 1.5rem;
+    }
+
+    a {
+      color: var(--accent-color);
       text-decoration: none;
     }
-    .link:hover {
+
+    a:hover {
       text-decoration: underline;
+    }
+
+    @media screen and (max-width: 600px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .profile-img {
+        width: 100px;
+        height: 100px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
+
+    <div class="card header">
       <img src="profile.jpg" alt="Profile Photo" class="profile-img">
       <div>
         <h1>Mallikarjuna</h1>
@@ -58,42 +96,42 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="card">
       <h2>About Me</h2>
-      <p>Hello! I’m a passionate Computer Science student who loves learning programming, building small projects, and exploring language and grammar. I enjoy coding in Python, HTML, and Java, and I'm constantly trying to improve my communication and problem-solving skills.</p>
+      <p>I am a passionate Computer Science student who enjoys exploring programming, native languages, and creative learning. I love building projects in Python, HTML, and Java, and sharing knowledge through meaningful content.</p>
     </div>
 
-    <div class="section">
+    <div class="card">
       <h2>Education</h2>
       <ul>
-        <li><strong>Bachelor of Computer Science</strong><br>
-        [Your College Name], [City] – [Year Started] to [Expected Year of Graduation]</li>
+        <li><strong>BSc in Computer Science</strong><br>
+        [Your College Name], [City] – [202X - 202X]</li>
       </ul>
     </div>
 
-    <div class="section">
+    <div class="card">
       <h2>Skills</h2>
       <ul>
-        <li>Python, HTML, Java</li>
-        <li>Basic Web Development</li>
-        <li>Communication & Problem Solving</li>
-        <li>Language Enthusiast (Telugu, Tamil, Sanskrit)</li>
+        <li>Languages: Python, Java, HTML/CSS</li>
+        <li>Tools: Git, Pydroid, VS Code</li>
+        <li>Interests: Native language etymology, Web apps, AI tools</li>
       </ul>
     </div>
 
-    <div class="section">
+    <div class="card">
       <h2>Projects</h2>
       <ul>
-        <li><strong>Telugu Dictionary Web App</strong> – A native word collection and search tool using basic web tech</li>
-        <li><strong>Simple Python Tools</strong> – Console-based utilities for learning logic and syntax</li>
+        <li><strong>Melimi Telugu Dictionary</strong> – Native Telugu word exploration and dictionary creation.</li>
+        <li><strong>Python Tools</strong> – Basic logic apps and mini utilities for students.</li>
       </ul>
     </div>
 
-    <div class="section">
+    <div class="card">
       <h2>Contact</h2>
-      <p>Email: <a href="mailto:your.email@example.com" class="link">your.email@example.com</a></p>
-      <p>GitHub: <a href="https://github.com/yourusername" class="link">github.com/yourusername</a></p>
+      <p>Email: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
+      <p>GitHub: <a href="https://github.com/yourusername">github.com/yourusername</a></p>
     </div>
+
   </div>
 </body>
 </html>
