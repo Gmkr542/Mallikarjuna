@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All-in-One Hand & Face Tracker</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 10px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+    }
+
+    /* Updated to a square container */
+    .camera-container {
+      position: relative;
+      width: 480px; /* New square size */
+      height: 480px; /* New square size */
+      margin: 0 auto;
+      border-radius: 8px;
+    }
+    
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      transform: scaleX(-1);
+    }
+    
+    /* Updated labels for a single canvas display */
+    .camera-labels {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .camera-labels h2 {
+        font-size: 1rem;
+        width: 50%;
+        text-align: center;
+    }
+
+    .info-cards {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 5px;
+      max-width: 900px;
+      margin: 15px auto;
+    }
+
+    .card {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 8px #000;
+      width: 120px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .card h2 {
+      font-size: 0.9rem;
+      color: #FFD700;
+      margin: 0 0 3px;
+    }
+
+    .card p {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .start-btn {
+      padding: 8px 16px;
+      background: #FFD700;
+      color: black;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 All-in-One Tracker</h1>
+
+  <div class="camera-container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+  </div>
+  
+  <div class="camera-labels">
+    <h2>Face & Hand Tracker</h2>
+  </div>
+  
+  <button id="startBtn" class="start-btn">Start Tracker</button>
+  
+  <div class="info-cards" id="infoSection">
+    <div class="card">
+      <h2>Total Fingers</h2>
+      <p id="totalFingers">0</p>
+    </div>
+    <div class="card">
+      <h2>Left Fingers</h2>
+      <p id="leftFingers">0</p>
+    </div>
+    <div class="card">
+      <h2>Right Fingers</h2>
+      <p id="rightFingers">0</p>
+    </div>
+    <div class="card">
+      <h2>Expression</h2>
+      <p id="expression">-</p>
+    </div>
+    <div class="card">
+      <h2>Mouth Open?</h2>
+      <p id="mouthOpen">-</p>
+    </div>
+    <div class="card">
+      <h2>Smile?</h2>
+      <p id="smile">-</p>
+    </div>
+    <div class="card">
+      <h2>Eyebrow Raise?</h2>
+      <p id="eyebrows">-</p>
+    </div>
+  </div>
+  
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    
+    const totalFingersText = document.getElementById('totalFingers');
+    const leftFingersText = document.getElementById('leftFingers');
+    const rightFingersText = document.getElementById('rightFingers');
+    const expressionText = document.getElementById('expression');
+    const mouthOpenText = document.getElementById('mouthOpen');
+    const smileText = document.getElementById('smile');
+    const eyebrowsText = document.getElementById('eyebrows');
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    const faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    });
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    // This combined onResults function will draw everything on one canvas
+    let lastHandResults = null;
+    let lastFaceResults = null;
+
+    hands.onResults((results) => {
+      lastHandResults = results;
+      drawCombinedResults();
+    });
+
+    faceMesh.onResults((results) => {
+      lastFaceResults = results;
+      drawCombinedResults();
+    });
+
+    function drawCombinedResults() {
+      if (!lastHandResults || !lastFaceResults) return;
+
+      // Clear the whole canvas and draw the video frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(lastFaceResults.image, 0, 0, canvas.width, canvas.height);
+
+      // Draw Face Landmarks
+      if (lastFaceResults.multiFaceLandmarks.length) {
+        const lm = lastFaceResults.multiFaceLandmarks[0];
+        drawConnectors(ctx, lm, FACEMESH_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+        drawConnectors(ctx, lm, FACEMESH_RIGHT_EYE, { color: '#FF3030' });
+        drawConnectors(ctx, lm, FACEMESH_RIGHT_EYEBROW, { color: '#FF3030' });
+        drawConnectors(ctx, lm, FACEMESH_LEFT_EYE, { color: '#30FF30' });
+        drawConnectors(ctx, lm, FACEMESH_LEFT_EYEBROW, { color: '#30FF30' });
+        drawConnectors(ctx, lm, FACEMESH_FACE_OVAL, { color: '#E0E0E0' });
+        drawConnectors(ctx, lm, FACEMESH_LIPS, { color: '#E0E0E0' });
+
+        const topLip = lm[13].y;
+        const bottomLip = lm[14].y;
+        const mouthOpen = Math.abs(bottomLip - topLip) > 0.05;
+        const leftMouth = lm[61].x;
+        const rightMouth = lm[291].x;
+        const smileWide = Math.abs(rightMouth - leftMouth) > 0.08;
+        const leftBrow = lm[70].y;
+        const leftEye = lm[159].y;
+        const browRaise = (leftBrow < leftEye - 0.01);
+
+        mouthOpenText.textContent = mouthOpen ? 'Yes 😮' : 'No';
+        smileText.textContent = smileWide && !mouthOpen ? 'Yes 😄' : 'No';
+        eyebrowsText.textContent = browRaise ? 'Yes 😲' : 'No';
+
+        if (mouthOpen) expressionText.textContent = 'Surprised 😮';
+        else if (smileWide) expressionText.textContent = 'Smiling 😊';
+        else expressionText.textContent = 'Neutral 😐';
+      } else {
+        expressionText.textContent = '-';
+        mouthOpenText.textContent = '-';
+        smileText.textContent = '-';
+        eyebrowsText.textContent = '-';
+      }
+      
+      // Draw Hand Landmarks
+      let total = 0, left = 0, right = 0;
+      if (lastHandResults.multiHandLandmarks && lastHandResults.multiHandedness) {
+        for (let i = 0; i < lastHandResults.multiHandLandmarks.length; i++) {
+            const handedness = lastHandResults.multiHandedness[i].label;
+            const landmarks = lastHandResults.multiHandLandmarks[i];
+
+            drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#0f0', lineWidth: 2 });
+            drawLandmarks(ctx, landmarks, { color: '#f00', radius: 3 });
+
+            const count = getFingerCount(landmarks, handedness);
+            if (handedness === 'Right') right = count;
+            else left = count;
+            total += count;
+        }
+      }
+      
+      totalFingersText.textContent = total;
+      leftFingersText.textContent = left;
+      rightFingersText.textContent = right;
+
+      // Reset the results so they don't get redrawn on the next frame
+      lastHandResults = null;
+      lastFaceResults = null;
+    }
+
+    function getFingerCount(landmarks, handedness) {
+      const tipIds = [4, 8, 12, 16, 20];
+      const pipIds = [3, 6, 10, 14, 18];
+      let count = 0;
+      for (let i = 0; i < 5; i++) {
+        const tip = landmarks[tipIds[i]];
+        const pip = landmarks[pipIds[i]];
+        
+        if (i === 0) { 
+          const mcp = landmarks[2];
+          if ((handedness === 'Right' && tip.x < mcp.x) || (handedness === 'Left' && tip.x > mcp.x)) {
+            count++;
+          }
+        } else {
+          if (tip.y < pip.y) count++;
+        }
+      }
+      return count;
+    }
+
+    async function startTracker() {
+      startBtn.disabled = true;
+      
+      // Updated video constraints to a square size
+      const videoConstraints = { width: 480, height: 480 };
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+      video.srcObject = stream;
+
+      video.addEventListener('loadeddata', () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+      });
+
+      const camera = new Camera(video, {
+        onFrame: async () => {
+          // Send the same video frame to both models
+          await hands.send({ image: video });
+          await faceMesh.send({ image: video });
+        },
+        width: videoConstraints.width,
+        height: videoConstraints.height
+      });
+      await camera.start();
+    }
+
+    startBtn.onclick = startTracker;
+  </script>
+</body>
+</html>
