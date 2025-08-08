@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Touchless Presentation Controller</title>
+
+  <!-- MediaPipe libs -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+  <style>
+    :root{--bg:#0f1720;--card:#111827;--accent:#FFD700}
+    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#fff;display:flex;flex-direction:column;align-items:center;padding:12px}
+    h1{font-size:1.1rem;margin:6px}
+    .grid{display:flex;gap:12px;align-items:flex-start}
+    .camera-wrap{position:relative;width:640px;height:480px;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 6px 20px rgba(0,0,0,.7)}
+    video, canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+    .controls{margin-left:12px;width:300px}
+    button{background:var(--accent);color:#000;border:none;padding:8px 10px;border-radius:8px;font-weight:700;cursor:pointer}
+    .card{background:var(--card);padding:10px;border-radius:8px;margin-bottom:8px}
+    .status{display:flex;gap:8px;flex-wrap:wrap}
+    .status .pill{background:#0006;padding:6px 8px;border-radius:6px}
+    small{color:#bbb}
+    .legend{font-size:0.9rem;line-height:1.4}
+    #pointer{position:absolute;width:18px;height:18px;border-radius:50%;background:rgba(255,0,0,0.85);transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:screen;display:none}
+  </style>
+</head>
+<body>
+  <h1>🔮 Touchless Presentation Controller</h1>
+  <div class="grid">
+    <div class="camera-wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="drawCanvas"></canvas> <!-- drawing overlay -->
+      <canvas id="overlay"></canvas>    <!-- landmarks + debug -->
+      <div id="pointer"></div>
+    </div>
+
+    <div class="controls">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Controls</strong>
+          <button id="startBtn">Start</button>
+        </div>
+        <div style="margin-top:8px" class="status">
+          <div class="pill">Mode: <span id="mode">Pointer</span></div>
+          <div class="pill">Left Swipe: Prev</div>
+          <div class="pill">Right Swipe: Next</div>
+        </div>
+      </div>
+
+      <div class="card legend">
+        <strong>Gesture legend</strong>
+        <ul>
+          <li><b>Pinch (thumb+index)</b> — Click / Select</li>
+          <li><b>Index finger</b> — Move pointer / Laser</li>
+          <li><b>Index + Middle</b> — Draw mode</li>
+          <li><b>3 fingers</b> — Erase last stroke</li>
+          <li><b>Right hand 2-finger swipe</b> — Next slide</li>
+          <li><b>Left hand 2-finger swipe</b> — Previous slide</li>
+          <li><b>Open palm (5 fingers)</b> — Toggle presentation (F5)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <small>Tips:</small>
+        <p style="margin:6px 0">Give a quick left/right swipe motion (horizontal > vertical) with index+middle to change slides. Keep gestures steady for draw/pointer modes.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Elements
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const drawCanvas = document.getElementById('drawCanvas');
+  const pointerEl = document.getElementById('pointer');
+  const startBtn = document.getElementById('startBtn');
+  const modeText = document.getElementById('mode');
+
+  // Canvas contexts
+  const octx = overlay.getContext('2d');
+  const dctx = drawCanvas.getContext('2d');
+
+  // State
+  let camera = null;
+  let hands = null;
+  let lastHandInfo = {}; // store prev positions per hand for swipe detection
+  let drawMode = false;
+  let pointerVisible = true;
+  let isDrawing = false;
+  let strokes = []; // array of strokes, each stroke is array of points
+  let currentStroke = null;
+  let pointer = {x:0,y:0};
+  let lastClickTime = 0;
+
+  // Utility: send keyboard event (works for slides in browser)
+  function sendKey(key) {
+    // Create and dispatch on window - many slide apps accept this
+    const e = new KeyboardEvent('keydown', {key: key, bubbles:true, cancelable:true});
+    window.dispatchEvent(e);
+    // Also dispatch to document
+    document.dispatchEvent(e);
+  }
+
+  // Simulate mouse click at element at pointer position
+  function simulateClick(x, y) {
+    // find element under the pointer in the viewport
+    const el = document.elementFromPoint(x, y);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    ['mousedown','mouseup','click'].forEach(type => {
+      el.dispatchEvent(new MouseEvent(type, {clientX: x, clientY: y, bubbles: true, cancelable: true}));
+    });
+  }
+
+  // Resize canvases to video size
+  function setCanvasSizes(w, h) {
+    overlay.width = w; overlay.height = h;
+    drawCanvas.width = w; drawCanvas.height = h;
+    drawCanvas.style.pointerEvents = 'none';
+  }
+
+  // Drawing helpers
+  function beginStroke(pt) {
+    currentStroke = [pt];
+    strokes.push(currentStroke);
+    isDrawing = true;
+  }
+  function addPointToStroke(pt) {
+    if (!currentStroke) beginStroke(pt);
+    currentStroke.push(pt);
+  }
+  function endStroke() {
+    currentStroke = null;
+    isDrawing = false;
+  }
+  function undoLastStroke() {
+    strokes.pop();
+    redrawStrokes();
+  }
+  function redrawStrokes() {
+    dctx.clearRect(0,0,dctx.canvas.width,dctx.canvas.height);
+    dctx.lineCap = 'round';
+    dctx.lineJoin = 'round';
+    dctx.lineWidth = 4;
+    strokes.forEach(s => {
+      if (s.length < 2) return;
+      dctx.beginPath();
+      dctx.moveTo(s[0].x, s[0].y);
+      for (let i=1;i<s.length;i++) dctx.lineTo(s[i].x,s[i].y);
+      dctx.stroke();
+    });
+  }
+
+  // Gesture detectors
+  function distance(a,b) {
+    const dx = a.x-b.x, dy = a.y-b.y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  // Map normalized hand coordinates (0..1, mirrored due to video) to canvas coordinates
+  function n2c(pt, w, h) {
+    // MediaPipe landmarks are normalized where (0,0) is left-top from the observer (not mirrored).
+    // We mirrored video, so flip x here for UX.
+    return { x: (1 - pt.x) * w, y: pt.y * h };
+  }
+
+  // Basic finger count and extended checks using tip & pip indices
+  function getFingerCount(landmarks, handedness) {
+    const tipIds = [4,8,12,16,20];
+    const pipIds = [3,6,10,14,18];
+    let count = 0;
+    for (let i=0;i<5;i++){
+      const tip = landmarks[tipIds[i]];
+      const pip = landmarks[pipIds[i]];
+      if (i==0) {
+        const mcp = landmarks[2];
+        if ((handedness === 'Right' && tip.x < mcp.x) || (handedness === 'Left' && tip.x > mcp.x)) count++;
+      } else {
+        if (tip.y < pip.y) count++;
+      }
+    }
+    return count;
+  }
+
+  // Detect pinch between thumb tip (4) and index tip (8)
+  function isPinching(landmarks, threshold=0.06) {
+    if (!landmarks) return false;
+    const thumb = landmarks[4], index = landmarks[8];
+    return distance(thumb, index) < threshold;
+  }
+
+  // Detect thumb up (thumb tip y < thumb mcp y)
+  function isThumbUp(landmarks) {
+    return landmarks[4].y < landmarks[2].y;
+  }
+
+  // Heuristic swipe detection: checks recent movement delta on x axis
+  function detectSwipe(handId, normalizedPosX, timestamp) {
+    const H = lastHandInfo[handId] || {history: []};
+    H.history.push({x: normalizedPosX, t: timestamp});
+    // keep last 8 records
+    if (H.history.length > 8) H.history.shift();
+    lastHandInfo[handId] = H;
+    // compute delta between newest and 6 frames ago
+    if (H.history.length < 6) return null;
+    const first = H.history[0], last = H.history[H.history.length-1];
+    const dx = last.x - first.x;
+    const dt = last.t - first.t;
+    const vx = dx / (dt || 1);
+    // swipe if horizontal delta large and velocity significant
+    if (Math.abs(dx) > 0.18 && Math.abs(vx) > 0.001) {
+      return dx > 0 ? 'right' : 'left';
+    }
+    return null;
+  }
+
+  // Mode switching (Pointer / Draw)
+  function setMode(m) {
+    drawMode = (m === 'draw');
+    modeText.textContent = m.charAt(0).toUpperCase() + m.slice(1);
+    pointerEl.style.display = pointerVisible ? 'block' : 'none';
+  }
+
+  // Main results handler for MediaPipe hands
+  function onResults(results) {
+    if (!video.videoWidth) return;
+    setCanvasSizes(video.videoWidth, video.videoHeight);
+
+    octx.clearRect(0,0,overlay.width, overlay.height);
+    // draw small background for readability
+    octx.fillStyle = 'rgba(0,0,0,0.0)';
+    octx.fillRect(0,0,overlay.width, overlay.height);
+
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      // no hands: stop drawing if drawing, hide pointer maybe
+      if (isDrawing) { endStroke(); redrawStrokes(); }
+      return;
+    }
+
+    const now = performance.now();
+
+    let primaryPointer = null; // prefer right hand for pointer
+    // loop hands
+    for (let i=0;i<results.multiHandedness.length;i++){
+      const handedness = results.multiHandedness[i].label; // "Right" or "Left"
+      const lm = results.multiHandLandmarks[i];
+
+      // Draw landmarks (debug)
+      drawConnectors(octx, lm, HAND_CONNECTIONS, {color:'#00FFAA', lineWidth:2});
+      drawLandmarks(octx, lm, {color:'#FFCC00', radius:2});
+
+      // normalized center point (use index finger tip for pointer)
+      const indexTip = lm[8];
+      const indexPos = n2c(indexTip, overlay.width, overlay.height);
+
+      // check pinch
+      const pinching = isPinching(lm, 0.06);
+      const fingers = getFingerCount(lm, handedness);
+
+      // swipe detection using wrist x coordinate
+      const wrist = lm[0];
+      const swipe = detectSwipe(handedness + i, wrist.x, now);
+
+      // Decide actions
+      // 1) Slides via 2-finger horizontal swipe gestures
+      if (fingers >= 2 && swipe) {
+        // require small cooldown to avoid repeated triggers
+        if (!lastHandInfo['cooldown']) lastHandInfo['cooldown'] = 0;
+        if (now - lastHandInfo['cooldown'] > 800) {
+          if (swipe === 'right') {
+            // If right hand -> next, left hand -> next? using handedness to decide
+            sendKey('ArrowRight');
+          } else {
+            sendKey('ArrowLeft');
+          }
+          lastHandInfo['cooldown'] = now;
+        }
+      }
+
+      // 2) Open palm toggle presentation (5 fingers)
+      if (fingers === 5) {
+        if (!lastHandInfo['palmCooldown'] || now - lastHandInfo['palmCooldown'] > 1200) {
+          // Toggle presentation start/stop (F5 usually starts slideshow)
+          sendKey('F5');
+          lastHandInfo['palmCooldown'] = now;
+        }
+      }
+
+      // 3) Pinch -> click
+      if (pinching) {
+        // debounce click so it doesn't fire repeatedly
+        if (now - lastClickTime > 700) {
+          // simulate a click at pointer position (client coords)
+          simulateClick(pointer.x, pointer.y);
+          lastClickTime = now;
+        }
+      }
+
+      // 4) Thumb-up toggles pointer visibility
+      if (isThumbUp(lm)) {
+        if (!lastHandInfo['thumbUpCooldown'] || now - lastHandInfo['thumbUpCooldown'] > 1200) {
+          pointerVisible = !pointerVisible;
+          pointerEl.style.display = pointerVisible ? 'block' : 'none';
+          lastHandInfo['thumbUpCooldown'] = now;
+        }
+      }
+
+      // 5) Drawing: index + middle finger -> draw mode & record strokes
+      if (fingers === 2 && !pinching) {
+        // enable draw mode while condition holds
+        setMode('draw');
+        const pt = {x: indexPos.x, y: indexPos.y};
+        // start stroke if just entered draw
+        if (!isDrawing) beginStroke(pt);
+        else addPointToStroke(pt);
+      } else {
+        // if previously drawing, end stroke
+        if (isDrawing) {
+          endStroke();
+        }
+      }
+
+      // 6) Three fingers => erase last stroke
+      if (fingers === 3) {
+        if (!lastHandInfo['eraseCooldown'] || now - lastHandInfo['eraseCooldown'] > 800) {
+          undoLastStroke();
+          lastHandInfo['eraseCooldown'] = now;
+        }
+      }
+
+      // 7) Pointer movement and draw overlay
+      // Prefer right hand as pointer, else left
+      if (handedness === 'Right' && !primaryPointer) primaryPointer = indexPos;
+      else if (!primaryPointer) primaryPointer = indexPos;
+
+      // Update pointer
+      if (primaryPointer) {
+        pointer.x = primaryPointer.x;
+        pointer.y = primaryPointer.y;
+        pointerEl.style.left = pointer.x + 'px';
+        pointerEl.style.top = pointer.y + 'px';
+        pointerEl.style.display = pointerVisible ? 'block' : 'none';
+      }
+
+      // Save last landmarks for potential extended logic
+      lastHandInfo[handedness + i] = lastHandInfo[handedness + i] || {};
+      lastHandInfo[handedness + i].lastLandmarks = lm;
+    }
+
+    // redraw strokes when drawing changed
+    redrawStrokes();
+
+    // final: if none in draw mode then set pointer mode label
+    if (!isDrawing && !drawMode) setMode('pointer');
+  }
+
+  // Start the MediaPipe Hands and camera
+  async function startTracker() {
+    startBtn.disabled = true;
+    startBtn.textContent = 'Starting...';
+
+    // configure hands
+    hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+    hands.onResults(onResults);
+
+    // camera
+    const stream = await navigator.mediaDevices.getUserMedia({video: {width:640, height:480, facingMode: 'user'}, audio:false});
+    video.srcObject = stream;
+
+    // Wait until video dims available
+    await new Promise(res => video.onloadeddata = res);
+    setCanvasSizes(video.videoWidth, video.videoHeight);
+
+    camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({image: video});
+      },
+      width: video.videoWidth,
+      height: video.videoHeight
+    });
+    await camera.start();
+
+    startBtn.textContent = 'Running';
+  }
+
+  // Hook start button
+  startBtn.onclick = () => {
+    if (startBtn.textContent === 'Start') startTracker();
+  };
+
+  // click to focus to capture key events (helpful for slide control)
+  document.body.addEventListener('click', ()=> window.focus());
+
+  // init UI defaults
+  setMode('pointer');
+</script>
+</body>
+</html>
